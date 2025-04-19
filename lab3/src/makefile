@@ -1,17 +1,23 @@
-CC=gcc
-CFLAGS=-I.
+CC = gcc
+CFLAGS = -Wall -Wextra -I.
+TARGETS = sequential_min_max parallel_min_max runner
+OBJS = find_min_max.o utils.o
 
-sequential_min_max : utils.o find_min_max.o utils.h find_min_max.h
-	$(CC) -o sequential_min_max find_min_max.o utils.o sequential_min_max.c $(CFLAGS)
+all: $(TARGETS)
 
-parallel_min_max : utils.o find_min_max.o utils.h find_min_max.h
-	$(CC) -o parallel_min_max utils.o find_min_max.o parallel_min_max.c $(CFLAGS)
+sequential_min_max: sequential_min_max.o $(OBJS)
+	$(CC) $(CFLAGS) $^ -o $@
 
-utils.o : utils.h
-	$(CC) -o utils.o -c utils.c $(CFLAGS)
+parallel_min_max: parallel_min_max.o $(OBJS)
+	$(CC) $(CFLAGS) $^ -o $@
 
-find_min_max.o : utils.h find_min_max.h
-	$(CC) -o find_min_max.o -c find_min_max.c $(CFLAGS)
+runner: runner.c
+	$(CC) $(CFLAGS) $^ -o $@
 
-clean :
-	rm utils.o find_min_max.o sequential_min_max parallel_min_max
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -f $(TARGETS) *.o
+
+.PHONY: all clean
