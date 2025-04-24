@@ -1,40 +1,24 @@
-# Определяем компилятор и флаги
 CC = gcc
-CFLAGS = -Wall
+CFLAGS = -I.
 
-# Определяем имена выходных файлов
-TCP_CLIENT = tcpclient
 TCP_SERVER = tcpserver
-UDP_CLIENT = udpclient
+TCP_CLIENT = tcpclient
 UDP_SERVER = udpserver
+UDP_CLIENT = udpclient
 
-# Исходные файлы
-TCP_CLIENT_SRC = tcpclient.c
-TCP_SERVER_SRC = tcpserver.c
-UDP_CLIENT_SRC = udpclient.c
-UDP_SERVER_SRC = udpserver.c
+all: $(TCP_SERVER) $(TCP_CLIENT) $(UDP_SERVER) $(UDP_CLIENT)
 
-# Целевая установка по умолчанию
-all: $(TCP_CLIENT) $(TCP_SERVER) $(UDP_CLIENT) $(UDP_SERVER)
+$(TCP_SERVER): tcpserver.c
+	$(CC) $(CFLAGS) -o $@ $<
 
-# Правила для компиляции TCP клиента
-$(TCP_CLIENT): $(TCP_CLIENT_SRC)
-	$(CC) $(CFLAGS) -o $(TCP_CLIENT) $(TCP_CLIENT_SRC)
+$(TCP_CLIENT): tcpclient.c
+	$(CC) $(CFLAGS) -o $@ $<
 
-# Правила для компиляции TCP сервера
-$(TCP_SERVER): $(TCP_SERVER_SRC)
-	$(CC) $(CFLAGS) -o $(TCP_SERVER) $(TCP_SERVER_SRC)
+$(UDP_SERVER): udpserver.c
+	$(CC) $(CFLAGS) -o $@ $<
 
-# Правила для компиляции UDP клиента
-$(UDP_CLIENT): $(UDP_CLIENT_SRC)
-	$(CC) $(CFLAGS) -o $(UDP_CLIENT) $(UDP_CLIENT_SRC)
+$(UDP_CLIENT): udpclient.c
+	$(CC) $(CFLAGS) -o $@ $<
 
-# Правила для компиляции UDP сервера
-$(UDP_SERVER): $(UDP_SERVER_SRC)
-	$(CC) $(CFLAGS) -o $(UDP_SERVER) $(UDP_SERVER_SRC)
-
-# Правила для очистки скомпилированных файлов
 clean:
-	rm -f $(TCP_CLIENT) $(TCP_SERVER) $(UDP_CLIENT) $(UDP_SERVER)
-
-.PHONY: all clean
+	rm -f $(TCP_SERVER) $(TCP_CLIENT) $(UDP_SERVER) $(UDP_CLIENT)
