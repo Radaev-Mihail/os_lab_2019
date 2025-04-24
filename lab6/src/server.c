@@ -9,29 +9,27 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include <sys/socket.h>
-#include "utils.h"
-
-// аргументы для вычисления факториала
-struct factorial_args {
+#include "multmodulo.h"
+struct FactorialArgs {
     uint64_t begin;
     uint64_t end;
     uint64_t mod;
 };
 
-// вычисление факториала в заданном диапазоне
-uint64_t calculate_factorial(const struct factorial_args *args) {
-    uint64_t result = 1;
+
+
+uint64_t Factorial(const struct FactorialArgs *args) {
+    uint64_t ans = 1;
     for (uint64_t i = args->begin; i <= args->end; i++) {
-        result = MultModulo(result, i, args->mod);
+        ans = MultModulo(ans, i, args->mod);
     }
-    return result;
+    return ans;
 }
 
-// функция для выполнения в потоке
-void *thread_factorial(void *args) {
-    struct factorial_args *fargs = (struct factorial_args *)args;
+void *ThreadFactorial(void *args) {
+    struct FactorialArgs *fargs = (struct FactorialArgs *)args;
     uint64_t *result = malloc(sizeof(uint64_t));
-    *result = calculate_factorial(fargs);
+    *result = Factorial(fargs);
     return result;
 }
 
@@ -39,7 +37,6 @@ int main(int argc, char **argv) {
     int tnum = -1;
     int port = -1;
 
-    // разбор аргументов командной строки
     while (true) {
         static struct option options[] = {
             {"port", required_argument, 0, 0},
@@ -61,57 +58,52 @@ int main(int argc, char **argv) {
             }
             break;
         default:
-            fprintf(stderr, "неизвестный аргумент\n");
+            fprintf(stderr, "Unknown argument\n");
             return 1;
         }
     }
 
-    // проверка обязательных аргументов
     if (port == -1 || tnum == -1) {
-        fprintf(stderr, "использование: %s --port <порт> --tnum <количество потоков>\n", argv[0]);
+        fprintf(stderr, "Usage: %s --port <port> --tnum <threads>\n", argv[0]);
         return 1;
     }
 
-    // создание сокета
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0) {
-        perror("ошибка создания сокета");
+        perror("socket");
         return 1;
     }
 
-    // настройка адреса сервера
     struct sockaddr_in server;
     server.sin_family = AF_INET;
     server.sin_port = htons(port);
     server.sin_addr.s_addr = htonl(INADDR_ANY);
 
     if (bind(server_fd, (struct sockaddr *)&server, sizeof(server)) < 0) {
-        perror("ошибка привязки сокета");
+        perror("bind");
         return 1;
     }
 
     if (listen(server_fd, 128) < 0) {
-        perror("ошибка прослушивания");
+        perror("listen");
         return 1;
     }
 
-    printf("сервер запущен на порту %d\n", port);
+    printf("Server listening at %d\n", port);
 
-    // основной цикл сервера
     while (true) {
         struct sockaddr_in client;
         socklen_t client_len = sizeof(client);
         int client_fd = accept(server_fd, (struct sockaddr *)&client, &client_len);
 
         if (client_fd < 0) {
-            perror("ошибка принятия соединения");
+            perror("accept");
             continue;
         }
 
-        // получение данных от клиента
         uint64_t args[3];
         if (recv(client_fd, args, sizeof(args), 0) <= 0) {
-            perror("ошибка получения данных");
+            perror("recv");
             close(client_fd);
             continue;
         }
@@ -119,11 +111,10 @@ int main(int argc, char **argv) {
         uint64_t begin = args[0];
         uint64_t end = args[1];
         uint64_t mod = args[2];
-        printf("получено: %lu %lu %lu\n", begin, end, mod);
+        printf("Receive: %lu %lu %lu\n", begin, end, mod);
 
-        // распределение работы между потоками
         pthread_t threads[tnum];
-        struct factorial_args fargs[tnum];
+        struct FactorialArgs fargs[tnum];
         uint64_t chunk_size = (end - begin + 1) / tnum;
         uint64_t total = 1;
 
@@ -132,14 +123,13 @@ int main(int argc, char **argv) {
             fargs[i].end = (i == tnum - 1) ? end : (begin + (i + 1) * chunk_size - 1);
             fargs[i].mod = mod;
 
-            if (pthread_create(&threads[i], NULL, thread_factorial, &fargs[i]) != 0) {
-                perror("ошибка создания потока");
+            if (pthread_create(&threads[i], NULL, ThreadFactorial, &fargs[i]) != 0) {
+                perror("pthread_create");
                 close(client_fd);
                 return 1;
             }
         }
 
-        // сбор результатов от потоков
         for (int i = 0; i < tnum; i++) {
             uint64_t *result;
             pthread_join(threads[i], (void **)&result);
@@ -147,11 +137,10 @@ int main(int argc, char **argv) {
             free(result);
         }
 
-        printf("результат: %lu\n", total);
+        printf("Total: %lu\n", total);
 
-        // отправка результата клиенту
         if (send(client_fd, &total, sizeof(total), 0) <= 0) {
-            perror("ошибка отправки данных");
+            perror("send");
         }
 
         close(client_fd);

@@ -9,32 +9,30 @@
 #include <pthread.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include "utils.h"
-
-// структура для хранения информации о сервере
-struct server {
+#include "multmodulo.h"
+struct Server {
     char ip[64];
     int port;
 };
 
-// чтение списка серверов из файла
-int read_servers(const char *path, struct server **servers) {
+
+
+int read_servers(const char *path, struct Server **servers) {
     FILE *file = fopen(path, "r");
     if (file == NULL) {
-        fprintf(stderr, "ошибка: не удалось открыть файл %s\n", path);
+        fprintf(stderr, "Error: Cannot open file %s\n", path);
         return -1;
     }
 
     size_t count = 0;
     size_t capacity = 4;
-    *servers = malloc(capacity * sizeof(struct server));
+    *servers = malloc(capacity * sizeof(struct Server));
 
-    // чтение ip и порта каждого сервера из файла
     while (fscanf(file, "%63s %d", (*servers)[count].ip, &(*servers)[count].port) == 2) {
         count++;
         if (count >= capacity) {
             capacity *= 2;
-            *servers = realloc(*servers, capacity * sizeof(struct server));
+            *servers = realloc(*servers, capacity * sizeof(struct Server));
         }
     }
 
@@ -42,37 +40,33 @@ int read_servers(const char *path, struct server **servers) {
     return count;
 }
 
-// отправка задачи на сервер и получение результата
-int send_task(const struct server *server, uint64_t begin, uint64_t end, uint64_t mod, uint64_t *result) {
+int send_task(const struct Server *server, uint64_t begin, uint64_t end, uint64_t mod, uint64_t *result) {
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
-        fprintf(stderr, "ошибка: не удалось создать сокет\n");
+        fprintf(stderr, "Error: Cannot create socket\n");
         return -1;
     }
 
-    // настройка адреса сервера
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(server->port);
     inet_pton(AF_INET, server->ip, &server_addr.sin_addr);
 
     if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
-        fprintf(stderr, "ошибка: не удалось подключиться к серверу %s:%d\n", server->ip, server->port);
+        fprintf(stderr, "Error: Cannot connect to server %s:%d\n", server->ip, server->port);
         close(sock);
         return -1;
     }
 
-    // отправка задачи на сервер
     uint64_t task[3] = {begin, end, mod};
     if (send(sock, task, sizeof(task), 0) < 0) {
-        fprintf(stderr, "ошибка: не удалось отправить данные на сервер\n");
+        fprintf(stderr, "Error: Cannot send data to server\n");
         close(sock);
         return -1;
     }
 
-    // получение результата от сервера
     if (recv(sock, result, sizeof(*result), 0) < 0) {
-        fprintf(stderr, "ошибка: не удалось получить данные от сервера\n");
+        fprintf(stderr, "Error: Cannot receive data from server\n");
         close(sock);
         return -1;
     }
@@ -86,7 +80,6 @@ int main(int argc, char **argv) {
     uint64_t mod = 0;
     char *servers_path = NULL;
 
-    // разбор аргументов командной строки
     while (true) {
         int current_optind = optind ? optind : 1;
 
@@ -113,26 +106,23 @@ int main(int argc, char **argv) {
             servers_path = optarg;
             break;
         default:
-            fprintf(stderr, "использование: %s --k <значение> --mod <значение> --servers <путь>\n", argv[0]);
+            fprintf(stderr, "Usage: %s --k <value> --mod <value> --servers <path>\n", argv[0]);
             return 1;
         }
     }
 
-    // проверка обязательных аргументов
     if (k == 0 || mod == 0 || servers_path == NULL) {
-        fprintf(stderr, "использование: %s --k <значение> --mod <значение> --servers <путь>\n", argv[0]);
+        fprintf(stderr, "Usage: %s --k <value> --mod <value> --servers <path>\n", argv[0]);
         return 1;
     }
 
-    // загрузка списка серверов
-    struct server *servers = NULL;
+    struct Server *servers = NULL;
     int servers_count = read_servers(servers_path, &servers);
     if (servers_count <= 0) {
-        fprintf(stderr, "ошибка: нет доступных серверов\n");
+        fprintf(stderr, "Error: No servers available\n");
         return 1;
     }
 
-    // распределение работы между серверами
     uint64_t chunk_size = k / servers_count;
     uint64_t remaining = k % servers_count;
 
@@ -141,13 +131,12 @@ int main(int argc, char **argv) {
         uint64_t begin = i * chunk_size + 1;
         uint64_t end = (i + 1) * chunk_size;
 
-        // добавление остатка к последнему серверу
-        if (i == servers_count - 1)
+        if (i == servers_count - 1) // Add remaining part to the last chunk
             end += remaining;
 
         uint64_t result = 0;
         if (send_task(&servers[i], begin, end, mod, &result) < 0) {
-            fprintf(stderr, "ошибка: задача не выполнена на сервере %s:%d\n", servers[i].ip, servers[i].port);
+            fprintf(stderr, "Error: Task failed on server %s:%d\n", servers[i].ip, servers[i].port);
             free(servers);
             return 1;
         }
@@ -155,7 +144,7 @@ int main(int argc, char **argv) {
         total = MultModulo(total, result, mod);
     }
 
-    printf("итоговый результат: %lu\n", total);
+    printf("Final answer: %lu\n", total);
 
     free(servers);
     return 0;

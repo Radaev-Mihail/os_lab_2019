@@ -1,19 +1,22 @@
 CC = gcc
-CFLAGS = -Wall -pthread
+CFLAGS = -I. -lpthread
 
-CLIENT = client
-SERVER = server
+all: client server
 
-CLIENT_SRC = client.c utils.c
-SERVER_SRC = server.c utils.c
+client: client.o multmodulo.o
+	$(CC) -o client client.o multmodulo.o $(CFLAGS)
 
-all: $(CLIENT) $(SERVER)
+server: server.o multmodulo.o
+	$(CC) -o server server.o multmodulo.o $(CFLAGS)
 
-$(CLIENT): $(CLIENT_SRC)
-	$(CC) $(CFLAGS) -o $(CLIENT) $(CLIENT_SRC)
+client.o: client.c multmodulo.h
+	$(CC) -c client.c $(CFLAGS)
 
-$(SERVER): $(SERVER_SRC)
-	$(CC) $(CFLAGS) -o $(SERVER) $(SERVER_SRC)
+server.o: server.c multmodulo.h
+	$(CC) -c server.c $(CFLAGS)
+
+multmodulo.o: multmodulo.c multmodulo.h
+	$(CC) -c multmodulo.c $(CFLAGS)
 
 clean:
-	rm -f $(CLIENT) $(SERVER)
+	rm -f *.o client server
